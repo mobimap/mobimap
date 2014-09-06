@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="." default="rebuild">
+  <!-- SET WTK HOME DIR -->
+  <property name="jdk.home" value="C:/Program Files/WTK2.5.2_01/"/>
+  <property name="dest" value="classes"/>
+  <property name="src" value="src"/>
+  <property name="distrib" value="distrib"/>
+  <property name="mapbuilderFiles" value="${distrib}/files"/>
+
+  <path id="project.class.path">
+    <pathelement location="${dest}"/>
+    <pathelement location="${jdk.home}/lib/midpapi20.jar"/>
+    <pathelement location="${jdk.home}/lib/cldcapi10.jar"/>
+    <pathelement location="${jdk.home}/lib/wma11.jar"/>
+  </path>
+
+  <property name="midp" value="MIDP-2.0"/>
+  <property name="cldc" value="CLDC-1.0"/>
+  <property name="midletName" value="Mobimap Generic"/>
+  <property name="midletVersion" value="4.2"/>
+  <property name="midletDescription" value="Mobimap - city map for mobile phones"/>
+  <property name="midletVendor" value="Ilya Shakhat"/>
+
+  <target name="clean">
+    <delete file="${distrib}/mobimap.jar"/>
+    <delete failonerror="false" includeemptydirs="true">
+      <fileset dir="${dest}"/>
+      <fileset dir="${mapbuilderFiles}"/>
+      <fileset dir="${distrib}"/>
+    </delete>
+  </target>
+
+  <target name="resbuild">
+    <java jar="sbin/resbuild.jar" fork="true">
+      <arg value="opt/locale_ru.txt"/>
+      <arg value="res/locale"/>
+    </java>    
+    <java jar="sbin/resbuild.jar" fork="true">
+      <arg value="opt/profile.txt"/>
+      <arg value="res/profile"/>
+    </java>    
+  </target>
+
+  <target name="init">
+    <mkdir dir="${dest}"/>
+    <mkdir dir="${distrib}"/>
+    <mkdir dir="${mapbuilderFiles}"/>
+  </target>
+
+  <target name="compile" depends="init">
+    <javac bootclasspathref="project.class.path" destdir="${dest}" target="1.2" source="1.2">
+      <src path="${src}"/>
+    </javac>
+  </target>
+
+  <target name="obfuscate">
+    <taskdef resource="proguard/ant/task.properties"
+             classpath="sbin/proguard.jar" />
+
+    <mkdir dir="obfuscate-temp"/>
+    <proguard overloadaggressively="false"
+            allowaccessmodification="true"
+            printseeds="on"
+            usemixedcaseclassnames="false"
+            repackageclasses=""
+            microedition="true"
+            >
+
+        <!-- Specify the input jars, output jars, and library jars. -->
+        <injar  file="${dest}" />
+        <outjar file="obfuscate-temp" />
+
+        <libraryjar file="${jdk.home}/lib/midpapi20.jar"/>
+        <libraryjar file="${jdk.home}/lib/cldcapi10.jar"/>
+        <libraryjar file="${jdk.home}/lib/wma11.jar"/>
+
+        <!-- Preserve all public midlets. -->
+        <keep access="public" extends="javax.microedition.midlet.MIDlet" />
+    </proguard>
+  </target>
+
+  <target name="preverify" description="Preverify classes">
+    <exec dir="." executable="${jdk.home}/bin/preverify.exe" failonerror="true">
+      <arg value="-classpath"/>
+      <arg value="obfuscate-temp;${jdk.home}/lib/midpapi20.jar;${jdk.home}/lib/cldcapi10.jar;${jdk.home}/lib/wma11.jar"/>
+      <arg value="-d"/>
+      <arg value="verify-temp"/>                                            
+      <arg line="-cldc"/>
+      <arg value="obfuscate-temp"/>
+    </exec>
+  </target>
+
+  <target name="archive">
+    <manifest file="TEMP_MANIFEST">
+      <attribute name="MIDlet-1" value="${midletName}, /icon.png, com.ish.mobimap.msrt"/>
+      <attribute name="MIDlet-Icon" value="/icon.png"/>
+      <attribute name="MIDlet-Description" value="${midletDescription}"/>
+      <attribute name="MIDlet-Name" value="${midletName}"/>
+      <attribute name="MIDlet-Vendor" value="${midletVendor}"/>
+      <attribute name="MIDlet-Version" value="${midletVersion}"/>
+      <attribute name="MicroEdition-Configuration" value="${cldc}"/>
+      <attribute name="MicroEdition-Profile" value="${midp}"/>
+    </manifest>
+    <jar compress="true" destfile="${distrib}/mobimap.jar" manifest="TEMP_MANIFEST">
+      <zipfileset dir="res/"/>
+      <fileset dir="verify-temp">
+        <include name="**/*.*"/>
+      </fileset>
+    </jar>
+    <length file="${distrib}/mobimap.jar" property="jarlength" />
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-1: ${midletName}, /icon.png, com.ish.mobimap.msrt${line.separator}"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Icon: /icon.png${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Description: ${midletDescription}${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Jar-Size: ${jarlength}${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Jar-URL: mobimap.jar${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Name: ${midletName}${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Vendor: ${midletVendor}${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MIDlet-Version: ${midletVersion}${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MicroEdition-Configuration: ${cldc}${line.separator}" append="yes"/>
+    <echo file="${distrib}/mobimap.jad" message="MicroEdition-Profile: ${midp}${line.separator}" append="yes"/>
+  </target>
+
+  <target name="collect">
+    <move todir="${mapbuilderFiles}">
+      <fileset dir="verify-temp">
+        <include name="**/*"/>
+      </fileset>      
+    </move>
+    <copy todir="${mapbuilderFiles}/f">
+      <fileset dir="res/f" />
+    </copy>
+    <copy todir="${mapbuilderFiles}/i">
+      <fileset dir="res/i" />
+    </copy>
+    <copy file="res/icon.png" todir="${mapbuilderFiles}"/>
+  </target>
+
+  <target name="finalize">
+    <delete dir="${dest}"/>
+    <delete dir="obfuscate-temp" includeemptydirs="true"/>
+    <delete dir="verify-temp" includeemptydirs="true"/>
+    <delete file="TEMP_MANIFEST"/>
+  </target>
+
+  <target name="make" depends="compile,obfuscate,preverify,archive,collect"/>
+
+  <target name="rebuild" depends="clean,resbuild,make,finalize"/>
+
+</project>
